@@ -1,9 +1,7 @@
 import requests
 from bs4 import BeautifulSoup
-from datetime import datetime
 import random
 import webbrowser
-import re
 
 
 class WeatherMusicBot:
@@ -81,62 +79,23 @@ class WeatherMusicBot:
             response.encoding = 'utf-8'
             soup = BeautifulSoup(response.text, 'html.parser')
 
-            # Ищем описание погоды (облачность)
+            # Получаем описание погоды из data-tooltip
             weather_tab = soup.find('div', class_='weathertab is-active')
-            weather_desc = 'Не определено'
+            weather_desc = weather_tab.get('data-tooltip', 'Не определено')
 
-            if weather_tab:
-                # Ищем tooltip с описанием погоды
-                tooltip = weather_tab.get('data-tooltip', '')
-                if tooltip:
-                    weather_desc = tooltip
-                else:
-                    # Альтернативный поиск описания
-                    icon_group = weather_tab.find('div', class_='weather-icon-group')
-                    if icon_group:
-                        parent = weather_tab.find_parent()
-                        if parent:
-                            desc_elem = parent.find('div', class_='tooltip-text')
-                            if desc_elem:
-                                weather_desc = desc_elem.text.strip()
-            else:
-                # Поиск в блоке current weather
-                cw_block = soup.find('div', class_='cw')
-                if cw_block:
-                    desc_elem = cw_block.find('div', class_='description')
-                    if desc_elem:
-                        weather_desc = desc_elem.text.strip()
-
-            # Поиск температуры
+            # Получаем температуру
             temp_elem = soup.find('temperature-value', {'value': True})
-            if not temp_elem:
-                temp_elem = soup.find('span', class_='unit unit_temperature_c')
-
             temperature = None
             if temp_elem:
-                if temp_elem.name == 'temperature-value':
-                    temp_value = temp_elem.get('value')
-                else:
-                    temp_value = temp_elem.text
+                temp_value = temp_elem.get('value')
                 try:
                     temperature = int(float(temp_value))
                 except:
                     temperature = None
 
-            # Определяем, пасмурно ли
-            cloudy_keywords = ['пасмурно', 'облачно', 'тучи', 'дождь', 'снег', 'морось', 'гроза', 'пасмурная']
+            # Определяем, пасмурно ли по ключевым словам
+            cloudy_keywords = ['пасмурно', 'облачно', 'тучи', 'дождь', 'снег', 'морось', 'гроза']
             is_cloudy = any(keyword in weather_desc.lower() for keyword in cloudy_keywords)
-
-            # Если не удалось определить по ключевым словам, пробуем по иконке
-            if weather_tab and not is_cloudy:
-                icon_use = weather_tab.find('use')
-                if icon_use:
-                    href = icon_use.get('href', '')
-                    # Иконки с облаками: d_c2, d_c3, n_c2, n_c3 и т.д.
-                    if '_c2' in href or '_c3' in href or '_c4' in href:
-                        is_cloudy = True
-                    elif '_c0' in href or '_c1' in href:
-                        is_cloudy = False
 
             return {
                 'condition': 'пасмурно' if is_cloudy else 'ясно/солнечно',
@@ -156,7 +115,6 @@ class WeatherMusicBot:
         """
         print("\n🔧 ДЕМО-РЕЖИМ: Использую тестовые данные")
 
-        # Случайный выбор погоды
         weather_types = [
             {'desc': 'Пасмурно, небольшой дождь', 'cloudy': True, 'temp': 5},
             {'desc': 'Ясно, солнечно', 'cloudy': False, 'temp': 18},
@@ -252,17 +210,13 @@ class WeatherMusicBot:
         print(f"\n📍 Город: {self.city}")
         print("🌍 Получаю данные о погоде с Gismeteo...")
 
-        # Получаем погоду
         self.weather_data = self.get_weather_from_gismeteo()
 
         if not self.weather_data:
             print("❌ Не удалось получить данные о погоде")
             return
 
-        # Определяем плейлист
         playlist = self.get_music_recommendation(self.weather_data['is_cloudy'])
-
-        # Показываем плейлист
         self.display_playlist(playlist, self.weather_data)
 
         print("\n👋 Спасибо за использование Music Weather Bot!")
